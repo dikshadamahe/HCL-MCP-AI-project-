@@ -9,7 +9,7 @@ RecovAI is a full-stack application that helps plant operators and metallurgists
 ---
 
 ## Live Deployment
-- **Live Demo (on Render)**: [https://recovai-xys2.onrender.com](https://recovai-xys2.onrender.com)
+- **Live Demo (on Render)**: [https://hcl-recovai.onrender.com](https://hcl-recovai.onrender.com)
 - **Database**: Managed PostgreSQL Database (Render)
 - **Chatbot / NLP**: Agentic ReAct Tool-Calling Loop
 
