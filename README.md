@@ -426,8 +426,6 @@ History in the UI uses `GET /history/predictions`, which returns both **shift da
 | Name | Role |
 |------|------|
 | Diksha Damahe | Frontend UI development, FastAPI backend implementation, integrated ML models into the system, image-based dataset generation, and full-stack system integration(connecting frontend, backend, database, and AI modules), Authored project documentation, including the GitHub README, installation guide, and usage instructions,SQLite integation  |
-| Bhavya Jaiprakash Khatri | Made project report|
-| Ritica Awasthi | Database layer — SQLite integation |
 
 ---
 
