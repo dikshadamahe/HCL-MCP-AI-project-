@@ -193,7 +193,7 @@ table.hcl tbody tr:hover{background:#F5E6D0}
 
 <!-- Change 10: Demo Mode Banner -->
 <div id="demoBanner" style="display:none;background:#FFF8E1;border-bottom:2px solid #FFA000;padding:8px 16px;font-size:13px;color:#5C2E00;position:relative">
-  ⚠️ Server not connected — some features use offline estimates. Start the backend on your computer for full predictions, history, and AI chat.
+  ⚠️ Server waking up or unreachable — Render free tier can take up to 90 seconds on first load. Wait, then refresh. Some features use offline estimates until connected.
   <button onclick="document.getElementById('demoBanner').style.display='none'" aria-label="Dismiss banner" style="position:absolute;right:12px;top:8px;background:none;border:none;font-size:16px;cursor:pointer;color:#5C2E00">✕</button>
 </div>
 
@@ -1237,6 +1237,10 @@ const LOCAL_API = 'http://localhost:8000';
 const API = window.location.port === '5500'
   ? LOCAL_API
   : (window.location.origin || LOCAL_API);
+const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+// Render free tier can take 30–90s on cold start; local dev stays fast.
+const API_TIMEOUT_MS = IS_LOCAL ? 8000 : 90000;
+const API_TIMEOUT_SLOW_MS = IS_LOCAL ? 15000 : 120000;
 const swaggerLink = document.getElementById('swaggerDocsLink');
 if (swaggerLink) swaggerLink.href = API + '/docs';
 
@@ -1309,7 +1313,7 @@ async function runPredictor(){
   try{
     const res=await Promise.race([
       fetch(API+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inputs)}),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_MS))
     ]);
     if(!res.ok) throw new Error('HTTP '+res.status);
     data=await res.json();
@@ -1451,7 +1455,7 @@ async function runOptimizer(){
     };
     const res=await Promise.race([
       fetch(API+'/optimize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(optBody)}),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_MS))
     ]);
     if(!res.ok) throw new Error('HTTP '+res.status);
     data=await res.json();
@@ -1564,7 +1568,7 @@ async function loadAnomalies(){
   try{
     const res=await Promise.race([
       fetch(API+'/api/anomalies?contamination='+cont+'&severity_filter='+encodeURIComponent(sevParam)),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_MS))
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
@@ -1646,7 +1650,7 @@ async function loadDashboard(){
   try{
     const res=await Promise.race([
       fetch(API+'/api/dashboard?month='+encodeURIComponent(month)+'&shift='+encodeURIComponent(shift)+'&feed_cond='+encodeURIComponent(cond)+'&model='+model),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_MS))
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const data=await res.json();
@@ -1801,7 +1805,7 @@ async function generateReport(){
     try{
       const res=await Promise.race([
         fetch(API+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shift,view,use_ai:true})}),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_SLOW_MS))
       ]);
       if(!res.ok)throw new Error('HTTP '+res.status);
       const rj=await res.json();
@@ -1960,7 +1964,7 @@ async function generateReport(){
     try{
       const res=await Promise.race([
         fetch(API+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shift,view,use_ai:true})}),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000))
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_SLOW_MS))
       ]);
       if(!res.ok) throw new Error('HTTP '+res.status);
       const rj=await res.json();
@@ -2143,7 +2147,7 @@ async function sendChat(){
   try{
     const res=await Promise.race([
       fetch(API+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,history:chatHistory.slice(-6)})}),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),API_TIMEOUT_SLOW_MS))
     ]);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const d=await res.json();
@@ -2294,12 +2298,15 @@ async function checkBackendStatus(){
   const el = document.getElementById('backend_status');
   const tc = document.getElementById('today_count');
   if(!el) return;
+  el.innerHTML = '<span style="color:#FFA000">● Connecting… (first load may take up to 90s on Render)</span>';
   try{
     const res = await fetch(API+'/health');
     const data = await res.json();
     const engines = Array.isArray(data.engines) ? data.engines.length : 0;
     const models = data.models_loaded != null ? data.models_loaded : 0;
     el.innerHTML = '<span style="color:#38A169">● Connected</span>';
+    const banner = document.getElementById('demoBanner');
+    if(banner) banner.style.display = 'none';
     // count today's submissions
     const hist = await fetch(API+'/history/predictions?limit=100');
     const rows = await hist.json();
@@ -2307,8 +2314,10 @@ async function checkBackendStatus(){
     const todayCount = rows.filter(r=>r.created_at&&r.created_at.startsWith(today)).length;
     if(tc) tc.textContent = todayCount;
   }catch(e){
-    if(el) el.innerHTML = '<span style="color:#E63946">● Offline — start uvicorn main:app --reload</span>';
+    if(el) el.innerHTML = '<span style="color:#E63946">● Offline — retry in a minute or refresh after server wakes up</span>';
     if(tc) tc.textContent = '0';
+    const banner = document.getElementById('demoBanner');
+    if(banner) banner.style.display = 'block';
   }
 }
 
